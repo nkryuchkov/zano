@@ -741,6 +741,25 @@ namespace currency
     res = string_tools::pod_to_hex(m_core.get_block_id_by_height(h));
     return true;
   }
+
+  //------------------------------------------------------------------------------------------------------------------------------
+  // equivalent of strstr, but with arbitrary bytes (ie, NULs)
+  // This does not differentiate between "not found" and "found at offset 0"
+  size_t slow_memmem(const void* start_buff, size_t buflen,const void* pat,size_t patlen)
+  {
+    const void* buf = start_buff;
+    const void* end=(const char*)buf+buflen;
+    if (patlen > buflen || patlen == 0) return 0;
+    while(buflen>0 && (buf=memchr(buf,((const char*)pat)[0],buflen-patlen+1)))
+    {
+      if(memcmp(buf,pat,patlen)==0)
+        return (const char*)buf - (const char*)start_buff;
+      buf=(const char*)buf+1;
+      buflen = (const char*)end - (const char*)buf;
+    }
+    return 0;
+  }
+
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_getblocktemplate(const COMMAND_RPC_GETBLOCKTEMPLATE::request& req, COMMAND_RPC_GETBLOCKTEMPLATE::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
@@ -790,7 +809,30 @@ namespace currency
     }
     res.difficulty = dt.convert_to<uint64_t>();
     blobdata block_blob = t_serializable_object_to_blob(b);
-
+    crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(b.miner_tx);
+    if(tx_pub_key == currency::null_pkey)
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+      error_resp.message = "Internal error: failed to create block template";
+      LOG_ERROR("Failed to get tx pub key in coinbase extra");
+      return false;
+    }
+    res.reserved_offset = slow_memmem((void*)block_blob.data(), block_blob.size(), &tx_pub_key, sizeof(tx_pub_key));
+    if(!res.reserved_offset)
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+      error_resp.message = "Internal error: failed to create block template";
+      LOG_ERROR("Failed to find tx pub key in blockblob");
+      return false;
+    }
+    res.reserved_offset += sizeof(tx_pub_key) + 2; //2 bytes: tag for TX_EXTRA_NONCE(1 byte), counter in TX_EXTRA_NONCE(1 byte)
+    if(res.reserved_offset + req.reserve_size > block_blob.size())
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+      error_resp.message = "Internal error: failed to create block template";
+      LOG_ERROR("Failed to calculate offset for ");
+      return false;
+    }
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
     res.status = CORE_RPC_STATUS_OK;
 

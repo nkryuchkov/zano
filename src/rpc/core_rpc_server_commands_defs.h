@@ -764,7 +764,7 @@ namespace currency
   {
     struct request
     {
-      //uint64_t reserve_size;       //max 255 bytes
+      uint64_t reserve_size;       //max 255 bytes
       std::string extra_text;
       std::string wallet_address;
       std::string stakeholder_address;
@@ -773,6 +773,7 @@ namespace currency
       uint64_t pos_index;          //
 
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(reserve_size)
         KV_SERIALIZE(extra_text)
         KV_SERIALIZE(wallet_address)   
         KV_SERIALIZE(stakeholder_address);
@@ -786,6 +787,7 @@ namespace currency
     {
       uint64_t difficulty;
       uint64_t height;
+      uint64_t reserved_offset;
       crypto::hash seed;
       blobdata blocktemplate_blob;
       std::string status;
@@ -793,6 +795,7 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(difficulty)
         KV_SERIALIZE(height)
+        KV_SERIALIZE(reserved_offset)
         KV_SERIALIZE_POD_AS_HEX_STRING(seed)
         KV_SERIALIZE(blocktemplate_blob)
         KV_SERIALIZE(status)
